@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { UserSettings, Theme } from "@/types";
+import { UserSettings, Theme, AccentColor } from "@/types";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -59,6 +59,34 @@ export default function SettingsModal({ isOpen, settings, onClose, onUpdateSetti
                       <div className={`w-full h-8 rounded-lg mb-2 ${t === "light" ? "bg-white border border-slate-200" : "bg-slate-800 border border-slate-700"}`} />
                       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                         {t === "light" ? "ライト" : "ダーク"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Accent color */}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3">アクセントカラー</h3>
+                <div className="flex gap-3 flex-wrap">
+                  {([
+                    { v: "indigo" as AccentColor, color: "#4f46e5", label: "インディゴ" },
+                    { v: "rose" as AccentColor, color: "#e11d48", label: "ローズ" },
+                    { v: "violet" as AccentColor, color: "#7c3aed", label: "バイオレット" },
+                    { v: "emerald" as AccentColor, color: "#059669", label: "エメラルド" },
+                    { v: "sky" as AccentColor, color: "#0284c7", label: "スカイ" },
+                  ]).map(({ v, color, label }) => (
+                    <button
+                      key={v}
+                      onClick={() => onUpdateSettings({ accentColor: v })}
+                      className={`flex flex-col items-center gap-1.5 cursor-pointer group`}
+                    >
+                      <span
+                        className={`w-9 h-9 rounded-full transition-all ${settings.accentColor === v ? "ring-2 ring-offset-2 ring-slate-400 dark:ring-slate-500 scale-110" : "hover:scale-105"}`}
+                        style={{ backgroundColor: color }}
+                      />
+                      <span className={`text-[10px] font-medium ${settings.accentColor === v ? "text-slate-800 dark:text-slate-100" : "text-slate-400 dark:text-slate-500"}`}>
+                        {label}
                       </span>
                     </button>
                   ))}

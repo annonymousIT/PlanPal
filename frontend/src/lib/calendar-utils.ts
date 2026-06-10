@@ -2,9 +2,10 @@ export function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
 }
 
-export function getFirstDayOfMonth(year: number, month: number): number {
-  const day = new Date(year, month, 1).getDay();
-  return day === 0 ? 6 : day - 1;
+export function getFirstDayOfMonth(year: number, month: number, weekStart: 'monday' | 'sunday' = 'monday'): number {
+  const day = new Date(year, month, 1).getDay(); // 0=Sun..6=Sat
+  if (weekStart === 'sunday') return day;
+  return day === 0 ? 6 : day - 1; // Mon=0..Sun=6
 }
 
 export function formatTime(date: Date): string {
@@ -27,16 +28,16 @@ export function isToday(date: Date): boolean {
   return isSameDay(date, new Date());
 }
 
-export function getWeekDates(date: Date): Date[] {
+export function getWeekDates(date: Date, weekStart: 'monday' | 'sunday' = 'monday'): Date[] {
   const d = new Date(date);
-  const day = d.getDay();
-  const mondayOffset = day === 0 ? -6 : 1 - day;
-  const monday = new Date(d);
-  monday.setDate(d.getDate() + mondayOffset);
+  const day = d.getDay(); // 0=Sun..6=Sat
+  const offset = weekStart === 'sunday' ? -day : (day === 0 ? -6 : 1 - day);
+  const start = new Date(d);
+  start.setDate(d.getDate() + offset);
   const dates: Date[] = [];
   for (let i = 0; i < 7; i++) {
-    const dd = new Date(monday);
-    dd.setDate(monday.getDate() + i);
+    const dd = new Date(start);
+    dd.setDate(start.getDate() + i);
     dates.push(dd);
   }
   return dates;

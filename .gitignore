@@ -5,6 +5,7 @@ vendor/
 tmp/
 .env
 .env.local
+*.exe
 .DS_Store
 Thumbs.db
 .vscode/

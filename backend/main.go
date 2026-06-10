@@ -3,44 +3,70 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
-	"github.com/gin-gonic/gin" // Ginをインポート
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		dsn = "postgresql://postgres:REDACTED_USE_ENV_VAR@shortline.proxy.rlwy.net:52617/railway"
+	if err := godotenv.Load(); err != nil {
+		log.Println(".env not found, using environment variables")
 	}
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		log.Fatal("DB接続失敗:", err)
-	}
-
-	// マイグレーション
-	db.AutoMigrate(&User{}, &ScheduleEvent{}, &EventFeedback{})
-	fmt.Println("Database migration successful!")
-
-	// 以下サーバー起動設定
+	InitDB()
 
 	r := gin.Default()
 
-	// 疎通確認用のテストエンドポイント
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"message": "PlanEase API is running!",
-		})
+	// CORS
+	r.Use(func(c *gin.Context) {
+		frontendURL := os.Getenv("FRONTEND_URL")
+		c.Header("Access-Control-Allow-Origin", frontendURL)
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization")
+		c.Header("Access-Control-Allow-Credentials", "true")
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
 	})
 
-	fmt.Println("Server starting on :8080...")
+	// Health check
+	r.GET("/ping", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"message": "PlanPal API is running!"})
+	})
 
-	// サーバーをポート8080で起動。これでプログラムが終了しなくなります。
-	err = r.Run(":8080")
-	if err != nil {
+	// Auth routes
+	r.GET("/auth/google", HandleGoogleLogin)
+	r.GET("/auth/google/callback", HandleGoogleCallback)
+	r.POST("/auth/refresh", HandleRefreshToken)
+
+	// Protected API routes
+	api := r.Group("/api", AuthMiddleware())
+	{
+		api.GET("/user/me", HandleGetMe)
+
+		api.GET("/events", HandleListEvents)
+		api.POST("/events", HandleCreateEvent)
+		api.PUT("/events/:id", HandleUpdateEvent)
+		api.DELETE("/events/:id", HandleDeleteEvent)
+
+		api.GET("/events/:id/feedback", HandleGetFeedback)
+		api.POST("/events/:id/feedback", HandleSubmitFeedback)
+		api.DELETE("/events/:id/feedback", HandleDeleteFeedback)
+
+		api.POST("/magic-bar", HandleMagicBar)
+		api.POST("/calendar/sync", HandleSyncCalendar)
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	fmt.Println("Server starting on :" + port)
+	if err := r.Run(":" + port); err != nil {
 		log.Fatal("サーバー起動失敗:", err)
 	}
 }

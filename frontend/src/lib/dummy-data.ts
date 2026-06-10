@@ -18,6 +18,7 @@ export const defaultCalendarSources: CalendarSource[] = [
 
 export const defaultSettings: UserSettings = {
   theme: "light",
+  accentColor: "indigo",
   locale: "ja",
   timezone: "Asia/Tokyo",
   notificationsOn: true,

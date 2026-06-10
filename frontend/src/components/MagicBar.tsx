@@ -3,27 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AIProposal, ScheduleEvent } from "@/types";
-
-const dummyProposals: AIProposal[] = [
-  {
-    id: "ai-1", title: "トラットリア・ベラ",
-    startAt: new Date(2026, 3, 19, 18, 30), endAt: new Date(2026, 3, 19, 20, 30),
-    location: "京都市中京区",
-    reasoning: "前回あやと行ったイタリアンに◯をつけていたので、同ジャンルのお店を提案",
-  },
-  {
-    id: "ai-2", title: "焼鳥 とりまる",
-    startAt: new Date(2026, 3, 20, 19, 0), endAt: new Date(2026, 3, 20, 21, 0),
-    location: "草津市",
-    reasoning: "最近パスタが続いているので、違うジャンルも。行動範囲内で評価の高いお店",
-  },
-  {
-    id: "ai-3", title: "カフェ sora",
-    startAt: new Date(2026, 3, 20, 15, 0), endAt: new Date(2026, 3, 20, 17, 0),
-    location: "南草津駅前",
-    reasoning: "あやとのカフェに◯が多いので、新しいカフェを提案。土曜午後が空いています",
-  },
-];
+import { fetchMagicBarProposals, createEvent } from "@/lib/api";
 
 interface MagicBarProps {
   onHighlightDates: (dates: Date[]) => void;
@@ -34,47 +14,70 @@ export default function MagicBar({ onHighlightDates, onAddEvent }: MagicBarProps
   const [input, setInput] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [proposals, setProposals] = useState<AIProposal[]>([]);
+  const [isDirect, setIsDirect] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [addedId, setAddedId] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!input.trim()) return;
     setIsLoading(true);
     setIsOpen(true);
-    setTimeout(() => {
-      setProposals(dummyProposals);
+    try {
+      const result = await fetchMagicBarProposals(input.trim());
+      setProposals(result.proposals);
+      setIsDirect(result.direct);
+      onHighlightDates(result.proposals.map((p: AIProposal) => p.startAt));
+      setErrorMsg(null);
+    } catch (e) {
+      setProposals([]);
+      setIsDirect(false);
+      setErrorMsg(e instanceof Error ? e.message : "AI提案の取得に失敗しました");
+    } finally {
       setIsLoading(false);
-      onHighlightDates(dummyProposals.map((p) => p.startAt));
-    }, 1500);
+    }
   };
 
   const handleClose = () => {
     setIsOpen(false);
     setProposals([]);
+    setIsDirect(false);
     setInput("");
     setAddedId(null);
+    setErrorMsg(null);
     onHighlightDates([]);
   };
 
-  const handleAddProposal = (p: AIProposal) => {
+  const handleAddProposal = async (p: AIProposal) => {
     setAddedId(p.id);
-    const newEvent: ScheduleEvent = {
-      id: `added-${p.id}`,
-      title: p.title,
-      startAt: p.startAt,
-      endAt: p.endAt,
-      location: p.location,
-      category: "food",
-      participants: [],
-      rating: null,
-      calendarId: "cal-1",
-    };
-    setTimeout(() => {
-      onAddEvent(newEvent);
+    try {
+      const saved = await createEvent({
+        title: p.title,
+        start_at: p.startAt.toISOString(),
+        end_at: p.endAt.toISOString(),
+        location: p.location,
+      });
       setTimeout(() => {
-        handleClose();
-      }, 800);
-    }, 400);
+        onAddEvent(saved);
+        setTimeout(handleClose, 800);
+      }, 400);
+    } catch {
+      // フォールバック: ローカルのみ追加
+      const newEvent: ScheduleEvent = {
+        id: `added-${p.id}`,
+        title: p.title,
+        startAt: p.startAt,
+        endAt: p.endAt,
+        location: p.location,
+        participants: [],
+        rating: null,
+        calendarId: "local",
+      };
+      setTimeout(() => {
+        onAddEvent(newEvent);
+        setTimeout(handleClose, 800);
+      }, 400);
+    }
   };
 
   return (
@@ -93,7 +96,7 @@ export default function MagicBar({ onHighlightDates, onAddEvent }: MagicBarProps
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
                   <span className="text-sm font-medium text-white">
-                    {isLoading ? "考え中..." : `${proposals.length}件の候補`}
+                    {isLoading ? "考え中..." : errorMsg ? "エラーが発生しました" : isDirect ? "日時を確認" : `${proposals.length}件の候補`}
                   </span>
                 </div>
                 <button onClick={handleClose} className="text-white/80 hover:text-white text-sm cursor-pointer">
@@ -107,6 +110,13 @@ export default function MagicBar({ onHighlightDates, onAddEvent }: MagicBarProps
                     <div className="w-5 h-5 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
                     <span className="text-sm text-slate-500 dark:text-slate-400">AIが候補を探しています...</span>
                   </div>
+                </div>
+              ) : errorMsg ? (
+                <div className="p-6 text-center">
+                  <p className="text-sm text-red-500 dark:text-red-400">{errorMsg}</p>
+                  <button onClick={handleClose} className="mt-3 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
+                    閉じる
+                  </button>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-80 overflow-y-auto">
@@ -179,7 +189,7 @@ export default function MagicBar({ onHighlightDates, onAddEvent }: MagicBarProps
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              placeholder="「今週末ディナー」「来週あやと映画」..."
+              placeholder="「今週末ディナー」「来週友達と映画」..."
               className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-100 dark:bg-slate-800 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 focus:bg-white dark:focus:bg-slate-700 transition-all text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
             />
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -188,7 +198,7 @@ export default function MagicBar({ onHighlightDates, onAddEvent }: MagicBarProps
           </div>
           <button
             onClick={handleSubmit}
-            disabled={!input.trim()}
+            disabled={!input.trim() || isLoading}
             className="px-5 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
           >
             提案
