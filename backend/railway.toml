@@ -1,0 +1,17 @@
+# Railway deployment config — declarative replacement for clicking around the UI.
+# Railway autodetects this file and uses it on every deploy.
+
+[build]
+# Use the Dockerfile rather than Nixpacks autodetection so the build is
+# reproducible across CI / local / Railway.
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Restart the service on crash with exponential backoff. Avoids a runaway
+# loop if a config bug causes immediate-exit on startup.
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+# Run the binary built by the Dockerfile. Railway also injects $PORT.
+startCommand = "./planpal-backend"

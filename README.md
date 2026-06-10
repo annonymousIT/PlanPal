@@ -1,5 +1,10 @@
 # PlanPal
 
+![CI](https://github.com/annonymousIT/PlanPal/actions/workflows/ci.yml/badge.svg)
+![Go](https://img.shields.io/badge/Go-1.23-00ADD8?logo=go)
+![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=next.js)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 **あなたを学ぶAIカレンダー** / The Calendar That Learns You
 
 Googleカレンダーと双方向同期しながら、ユーザーの「○/△/✕」評価とコメントから好みを学習し、自然言語で予定を提案・登録できるカレンダーアプリ。
@@ -116,6 +121,40 @@ npm install
 npm run dev
 # → http://localhost:3000
 ```
+
+---
+
+## 🚀 デプロイ
+
+### バックエンド → Railway
+
+`backend/` に `Dockerfile` と `railway.toml` を同梱。リポジトリを Railway に接続すると自動ビルドされる。
+
+1. [Railway](https://railway.app) で **New Project → Deploy from GitHub repo**
+2. リポジトリ選択 → **Root Directory** に `backend` を指定
+3. **PostgreSQL plugin を追加**（自動で `DATABASE_URL` 環境変数が注入される）
+4. 残りの環境変数を Service → Variables から追加：
+   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+   - `GOOGLE_REDIRECT_URL` → `https://<your-railway-domain>/auth/google/callback`
+   - `GEMINI_API_KEY`
+   - `JWT_SECRET`（32文字以上）
+   - `AES_KEY`（**ちょうど32バイト**）
+   - `FRONTEND_URL` → `https://<your-vercel-domain>`
+5. **Google Cloud Console** で OAuth クライアントの「承認済みリダイレクト URI」に同じ `https://<railway-domain>/auth/google/callback` を追加
+
+### フロントエンド → Vercel
+
+1. [Vercel](https://vercel.com) で **Import Project**
+2. **Root Directory** に `frontend` を指定（自動で Next.js 検出）
+3. 環境変数 `NEXT_PUBLIC_API_URL` に Railway のバックエンドURLを設定
+4. Deploy → 自動でCDN配信開始
+
+### CI
+
+`.github/workflows/ci.yml` が push / PR で以下を実行：
+
+- バックエンド: `go mod tidy` 差分チェック、`go build`、`go test -race`
+- フロントエンド: `tsc --noEmit`、`npm run lint`、`npm run build`
 
 ---
 
